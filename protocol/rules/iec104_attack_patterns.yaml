@@ -1,0 +1,235 @@
+# IEC 60870-5-104 Known Attack Pattern Rules
+# Based on real-world incidents and research.
+#
+# Sources:
+# - ESET Industroyer/CrashOverride analysis (2017)
+# - ESET Industroyer2 analysis (2022, Ukraine energy grid)
+# - Cisco Talos IEC-104 detection rules
+# - ICS/SCADA attack scenario research
+
+rules:
+  # --- Industroyer2-style patterns ---
+  - id: IEC104-ATK-001
+    name: Industroyer2-style command sequence
+    description: >
+      Single/double commands (TypeID 45/46) dominating traffic with high
+      command rate targeting multiple IOAs. Matches Industroyer2 pattern
+      of automated circuit breaker manipulation.
+    severity: critical
+    mitre_ics:
+      technique_id: T0855
+      technique_name: Unauthorized Command Message
+      tactic: Impair Process Control
+      secondary:
+        technique_id: T0831
+        technique_name: Manipulation of Control
+        tactic: Impair Process Control
+    type: window
+    conditions:
+      all:
+        - field: dominant_type_ratio
+          operator: ">"
+          value: 0.8
+        - field: command_rate
+          operator: ">"
+          value: 0.1
+        - field: orig_command_count
+          operator: ">"
+          value: 5
+    tags: [industroyer, circuit_breaker, automated_attack]
+
+  - id: IEC104-ATK-002
+    name: Single IOA target concentration
+    description: >
+      More than 90% of IEC-104 events target a single IOA (Information
+      Object Address). Indicates focused manipulation of one specific
+      control point, consistent with targeted attack on single equipment.
+    severity: high
+    mitre_ics:
+      technique_id: T0836
+      technique_name: Modify Parameter
+      tactic: Impair Process Control
+    type: window
+    conditions:
+      all:
+        - field: dominant_ioa_ratio
+          operator: ">"
+          value: 0.9
+        - field: n_events
+          operator: ">"
+          value: 10
+        - field: orig_event_ratio
+          operator: ">"
+          value: 0.5
+    tags: [targeted_manipulation, single_point]
+
+  - id: IEC104-ATK-003
+    name: IOA sweep / enumeration
+    description: >
+      High number of unique IOAs accessed in a window with low entropy
+      (sequential access pattern). Suggests automated IOA enumeration
+      to discover available data points.
+    severity: high
+    mitre_ics:
+      technique_id: T0846
+      technique_name: Remote System Discovery
+      tactic: Discovery
+    type: window
+    conditions:
+      all:
+        - field: unique_ioas
+          operator: ">"
+          value: 50
+        - field: is_missing_unique_ioas
+          operator: "=="
+          value: 0
+    tags: [reconnaissance, ioa_enumeration]
+
+  # --- Polling/monitoring manipulation ---
+  - id: IEC104-ATK-010
+    name: Excessive general interrogation
+    description: >
+      More than 3 general interrogation commands (TypeID 100) in a
+      60-second window. Normal polling sends 1 interrogation per cycle.
+      Excessive interrogation causes RTU overload and data flooding.
+    severity: high
+    mitre_ics:
+      technique_id: T0814
+      technique_name: Denial of Service
+      tactic: Inhibit Response Function
+    type: window
+    conditions:
+      all:
+        - field: interrogation_count
+          operator: ">"
+          value: 3
+    tags: [dos, rtu_overload, polling_abuse]
+
+  - id: IEC104-ATK-011
+    name: High event rate anomaly
+    description: >
+      More than 20 IEC-104 events per second sustained. Normal SCADA
+      event rate is typically 1-5/sec. Very high rates indicate data
+      injection, replay, or flood attack.
+    severity: high
+    mitre_ics:
+      technique_id: T0814
+      technique_name: Denial of Service
+      tactic: Inhibit Response Function
+    type: window
+    conditions:
+      all:
+        - field: events_per_second
+          operator: ">"
+          value: 20
+    tags: [flood, high_rate, injection]
+
+  # --- Link layer manipulation ---
+  - id: IEC104-ATK-020
+    name: Link restart without TESTFR
+    description: >
+      STARTDT (link start) activity without corresponding TESTFR
+      (keepalive) activity. Normal IEC-104 link management sends
+      TESTFR before reconnecting. Suggests forced reconnection
+      or session hijacking.
+    severity: high
+    mitre_ics:
+      technique_id: T0855
+      technique_name: Unauthorized Command Message
+      tactic: Impair Process Control
+    type: window
+    conditions:
+      all:
+        - field: u_startdt_act_count
+          operator: ">"
+          value: 2
+        - field: u_testfr_act_count
+          operator: "=="
+          value: 0
+    tags: [link_manipulation, session_hijack]
+
+  - id: IEC104-ATK-021
+    name: Excessive STOPDT activity
+    description: >
+      More than 3 STOPDT (link stop) commands in a window. Normal
+      operations rarely stop data transfer. Frequent stops indicate
+      denial-of-service against monitoring visibility.
+    severity: high
+    mitre_ics:
+      technique_id: T0814
+      technique_name: Denial of Service
+      tactic: Inhibit Response Function
+    type: window
+    conditions:
+      all:
+        - field: u_stopdt_act_count
+          operator: ">"
+          value: 3
+    tags: [dos, link_manipulation, visibility_loss]
+
+  - id: IEC104-ATK-022
+    name: Failed keepalive pattern
+    description: >
+      TESTFR requests sent but success ratio below 30%. Indicates
+      either network degradation, man-in-the-middle dropping
+      responses, or RTU being overwhelmed.
+    severity: medium
+    mitre_ics:
+      technique_id: T0814
+      technique_name: Denial of Service
+      tactic: Inhibit Response Function
+    type: window
+    conditions:
+      all:
+        - field: u_testfr_act_count
+          operator: ">"
+          value: 3
+        - field: u_testfr_success_ratio
+          operator: "<"
+          value: 0.3
+    tags: [link_degradation, mitm, dos]
+
+  # --- Sequence tracking ---
+  - id: IEC104-ATK-030
+    name: Sequence number discontinuity
+    description: >
+      Large gap in IEC-104 sequence numbers (>100) without a link
+      restart. Indicates dropped packets, injection at wrong sequence,
+      or session splicing.
+    severity: medium
+    mitre_ics:
+      technique_id: T0820
+      technique_name: Exploitation for Evasion
+      tactic: Evasion
+    type: window
+    conditions:
+      all:
+        - field: seq_max_gap
+          operator: ">"
+          value: 100
+        - field: is_missing_seq_max_gap
+          operator: "=="
+          value: 0
+    tags: [sequence_anomaly, injection, evasion]
+
+  - id: IEC104-ATK-031
+    name: Sequence reset without link restart
+    description: >
+      Sequence numbers reset to zero without a preceding STARTDT
+      command. Normal resets only occur during link initialization.
+      Unexpected reset indicates session hijacking or replay.
+    severity: critical
+    mitre_ics:
+      technique_id: T0855
+      technique_name: Unauthorized Command Message
+      tactic: Impair Process Control
+    type: window
+    conditions:
+      all:
+        - field: seq_reset_without_startdt
+          operator: ">"
+          value: 0
+        - field: is_missing_seq_reset_without_startdt
+          operator: "=="
+          value: 0
+    tags: [session_hijack, replay, critical]

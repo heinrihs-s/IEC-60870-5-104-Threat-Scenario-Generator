@@ -1,0 +1,181 @@
+# IEC 60870-5-104 Protocol Compliance Rules
+# These detect violations of the protocol specification.
+#
+# Rule format:
+#   id: unique rule identifier
+#   name: human-readable name
+#   description: what the rule detects
+#   severity: critical/high/medium/low/info
+#   mitre_ics: ATT&CK for ICS mapping
+#   type: "event" (per-IEC104-event) or "window" (per-feature-window)
+#   conditions: rule logic (evaluated by engine)
+#   tags: categorization tags
+
+rules:
+  # --- TypeID/COT validation rules ---
+  - id: IEC104-PROTO-001
+    name: Invalid TypeID
+    description: >
+      TypeID value outside the defined range (1-127) or in a gap between
+      defined groups (22-29, 41-44, 52-57, 65-69, 71-99, 108-109, 114-119).
+      May indicate fuzzing, malformed packets, or unknown extensions.
+    severity: high
+    mitre_ics:
+      technique_id: T0855
+      technique_name: Unauthorized Command Message
+      tactic: Impair Process Control
+    type: event
+    field: type_id
+    condition:
+      not_in_set: valid_typeids
+    tags: [protocol_violation, typeid]
+
+  - id: IEC104-PROTO-002
+    name: Invalid COT
+    description: >
+      Cause of Transmission value is in the reserved range (14-19, 42-43)
+      or is 0 (undefined). May indicate protocol abuse or misconfiguration.
+    severity: high
+    mitre_ics:
+      technique_id: T0855
+      technique_name: Unauthorized Command Message
+      tactic: Impair Process Control
+    type: event
+    field: cot
+    condition:
+      in_set: reserved_cots
+    tags: [protocol_violation, cot]
+
+  - id: IEC104-PROTO-003
+    name: Invalid TypeID+COT combination
+    description: >
+      The combination of TypeID and COT is not valid per the protocol
+      specification (IEC 60870-5-101 Table 14). For example, a command
+      TypeID (45-64) with COT=3 (spontaneous) is invalid. This can
+      indicate injection of malformed commands.
+    severity: critical
+    mitre_ics:
+      technique_id: T0855
+      technique_name: Unauthorized Command Message
+      tactic: Impair Process Control
+    type: event
+    fields: [type_id, cot]
+    condition:
+      function: invalid_typeid_cot
+    tags: [protocol_violation, typeid_cot_mismatch]
+
+  - id: IEC104-PROTO-004
+    name: Error COT response
+    description: >
+      Server returned an error COT (44-47): unknown type identification,
+      unknown COT, unknown common address of ASDU, or unknown IOA.
+      Frequent error COTs may indicate reconnaissance or injection attempts.
+    severity: medium
+    mitre_ics:
+      technique_id: T0846
+      technique_name: Remote System Discovery
+      tactic: Discovery
+    type: event
+    field: cot
+    condition:
+      in_set: error_cots
+    tags: [protocol_error, reconnaissance]
+
+  # --- Command direction rules ---
+  - id: IEC104-PROTO-010
+    name: Command from unexpected direction
+    description: >
+      A command TypeID (45-64) sent from the server/RTU side instead of
+      the client/master. In standard IEC-104, commands flow from master
+      to RTU. Reversed direction suggests man-in-the-middle or compromised RTU.
+    severity: critical
+    mitre_ics:
+      technique_id: T0843
+      technique_name: Program Download
+      tactic: Lateral Movement
+    type: event
+    fields: [type_id, direction]
+    condition:
+      function: command_from_server
+    tags: [protocol_violation, direction, mitm]
+
+  # --- Window-level aggregate rules ---
+  - id: IEC104-PROTO-020
+    name: Excessive unique TypeIDs in window
+    description: >
+      More than 15 distinct TypeIDs in a single 60-second window.
+      Normal SCADA polling uses 2-5 TypeIDs. High diversity suggests
+      fuzzing or reconnaissance of supported commands.
+    severity: medium
+    mitre_ics:
+      technique_id: T0846
+      technique_name: Remote System Discovery
+      tactic: Discovery
+    type: window
+    condition:
+      field: unique_typeIDs
+      operator: ">"
+      value: 15
+    tags: [reconnaissance, fuzzing]
+
+  - id: IEC104-PROTO-021
+    name: High command-to-monitor ratio
+    description: >
+      Command messages exceed 50% of all IEC-104 traffic in a window.
+      Normal SCADA is predominantly monitoring (>95% monitor direction).
+      High command ratio indicates active manipulation attempt.
+    severity: high
+    mitre_ics:
+      technique_id: T0855
+      technique_name: Unauthorized Command Message
+      tactic: Impair Process Control
+    type: window
+    condition:
+      field: command_vs_monitor_ratio
+      operator: ">"
+      value: 0.5
+    requires:
+      field: n_events
+      operator: ">"
+      value: 5
+    tags: [command_abuse, active_attack]
+
+  - id: IEC104-PROTO-022
+    name: Rapid command rate
+    description: >
+      More than 1 command per second sustained over a window.
+      Normal SCADA command rate is typically <0.1/sec.
+      Rapid commands indicate automated attack or malware.
+    severity: critical
+    mitre_ics:
+      technique_id: T0855
+      technique_name: Unauthorized Command Message
+      tactic: Impair Process Control
+    type: window
+    condition:
+      field: command_rate
+      operator: ">"
+      value: 1.0
+    tags: [command_flood, automated_attack]
+
+  - id: IEC104-PROTO-023
+    name: Non-standard port usage
+    description: >
+      IEC-104 traffic detected on a port other than 2404.
+      While technically possible, non-standard ports may indicate
+      tunneling or evasion.
+    severity: medium
+    mitre_ics:
+      technique_id: T0820
+      technique_name: Exploitation for Evasion
+      tactic: Evasion
+    type: window
+    condition:
+      field: unique_dst_ports
+      operator: ">"
+      value: 1
+    requires:
+      field: n_events
+      operator: ">"
+      value: 0
+    tags: [evasion, non_standard_port]
