@@ -71,9 +71,6 @@ Attack families: Reconnaissance, Collection, C2, Brute I/O, Parameter Modificati
 - numpy, pandas (for synthetic_attacks.py only)
 - No external dependencies for PCAP generators (pure stdlib)
 
-## IP Addresses
-
-All scripts use synthetic private IP addresses (192.168.x.x). No real infrastructure addresses are included.
 
 ## License
 
