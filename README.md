@@ -83,6 +83,10 @@ Attack families: Reconnaissance, Collection, C2, Brute I/O, Parameter Modificati
 - [iec104-rulebook](https://github.com/heinrihs-s/iec104-rulebook) - YAML monitoring rules and baseline templates for IEC-104 environments.
 - [zeek-iec104-lab](https://github.com/heinrihs-s/zeek-iec104-lab) - helper scripts for synthetic Zeek-style IEC-104 records.
 
+## Agent-Friendly Workflow
+
+This repo includes `AGENTS.md` for Codex, Claude Code, and other coding agents. Useful tasks include adding synthetic scenario families, improving metadata, generating summaries, and writing tests. Agent changes must stay offline and synthetic.
+
 
 ## License
 
