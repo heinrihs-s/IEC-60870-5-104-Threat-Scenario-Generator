@@ -1,6 +1,12 @@
 # IEC 60870-5-104 Threat Scenario Generator
 
-Generates synthetic IEC 60870-5-104 (IEC-104) attack traffic for testing intrusion detection systems targeting SCADA/ICS environments. All traffic uses synthetic IP addresses and is safe for research and benchmarking.
+Generates synthetic IEC 60870-5-104 (IEC-104) scenarios for testing intrusion detection systems and anomaly detectors in SCADA/ICS lab environments. All addresses, station identifiers, and event patterns are synthetic and intended for defensive research, benchmarking, and training.
+
+Keywords: IEC 60870-5-104, IEC-104, SCADA, ICS security, OT security, intrusion detection, synthetic traffic, cyber-physical security, MITRE ATT&CK for ICS.
+
+## Safety Scope
+
+This repository does not connect to live IEC-104 devices, PLCs, RTUs, substations, or industrial networks. It generates offline artifacts and feature vectors for lab-only evaluation. Use it for defensive testing, repeatable demos, and research notes; do not use it against systems you do not own or have explicit permission to test.
 
 ## Scripts
 
@@ -70,6 +76,12 @@ Attack families: Reconnaissance, Collection, C2, Brute I/O, Parameter Modificati
 - Python 3.10+
 - numpy, pandas (for synthetic_attacks.py only)
 - No external dependencies for PCAP generators (pure stdlib)
+
+## Related IEC-104 / SCADA Repos
+
+- [Scada-Agent-SafetyBench](https://github.com/heinrihs-s/Scada-Agent-SafetyBench) - simulation-only safety benchmark for AI assistants in SCADA/IEC-104 workflows.
+- [iec104-rulebook](https://github.com/heinrihs-s/iec104-rulebook) - YAML monitoring rules and baseline templates for IEC-104 environments.
+- [zeek-iec104-lab](https://github.com/heinrihs-s/zeek-iec104-lab) - helper scripts for synthetic Zeek-style IEC-104 records.
 
 
 ## License
